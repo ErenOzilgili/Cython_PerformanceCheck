@@ -1,9 +1,46 @@
 # Cython_PerformanceCheck
+---
 A library with examples to show the performance gains due to usage of cython. It will be used to demonstrate how and why efficiency increases when used cython.
 
+## Sample Run
+---
+After dependencies are satisfied, simply cd into SpeedTesting folder. 
+
+    cd SpeedTesting
+
+---
+Afterwards, running the following commands will help you
+run the sample code testSpeed.py.
+
+    python setup_cy.py build_ext --inplace
+
+    python setup_cuda.py build_ext --inplace
+
+    python testSpeed.py 
+  
+---
+Below is a sample run:
+
+    Repeating the functions 1 time, below are the execution times:
+    
+    Time it took for -python- is: 451.4805138280026
+    Time it took for -cython- is: 4.223426950997236
+    Time it took for -c wrapped with cython- is: 3.91828661800173
+    Time it took for -cuda wrapped with cython- is: 1.8142729489991325
+    
+    -Cython- is 106.89909380850044 times faster than -python-
+    
+    -C- is 115.22396339098113 times faster than -python- 
+
+    
+    -Cuda- is 248.84927820649463 times faster than -python- 
+
 ## Dependencies
+---
+
 
 ## Cython Speed
+---
 --> First of all, python is an interpreted language, which means that python code won't be directly compiled into machine code. On the other hand, cython     will compile the python into C code, then it will be compiled into machine code. Resulting machine code will run faster than the interpreted code.
 
 --> Python is dynamically typed, which means that variable types are determined and checked at runtime rather than during compilation. On the other hand,     Cython allows for static typing, meaning you can declare the types of variables explicitly. This feature of cython prevents the overhead associated       with dynamic typing in Python, leading to faster execution.
@@ -15,14 +52,12 @@ A library with examples to show the performance gains due to usage of cython. It
 --> Cython seamlessly integrates with C and C++ libraries, allowing for the use of highly optimized external libraries directly in the code, which can       enhance performance.
     
 ## Data Conversions
-
-
+---
 
 ## Explanations of Commands
 ### Setup.py Files
+---
 Here is a sample from this repository (setup_cuda.py):
-
-'''
     
     #'Extension': This is used to define extension modules that need to be compiled.
     #'get_python_inc': This function returns the path to the Python include directory, necessary for compiling extensions.
@@ -79,4 +114,3 @@ Here is a sample from this repository (setup_cuda.py):
         cmdclass={'build_ext': custom_build_ext}, #Uses the custom build class to handle the build process.
         zip_safe=False,
     )
-'''
