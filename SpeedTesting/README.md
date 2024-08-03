@@ -143,8 +143,9 @@ Below is a sample run:
 
 
 ## Explanations of Commands Used
-### -Setup- files
 ---
+### -Setup- files
+
 Here is a sample from this repository with added explanations using '#'. (./SpeedTesting/setup_cuda.py):
     
     #'Extension': This is used to define extension modules that need to be compiled.
