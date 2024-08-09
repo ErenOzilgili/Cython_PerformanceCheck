@@ -53,3 +53,18 @@ cdef class wPerson:
 		addr.zipCode = address[3]
 
 		return addr
+
+
+#A function that takes a wPerson object as a parameter & prints its attributes.
+
+def LocationTracker(wPerson per):   
+	print("{4}'s Location Found! \nState: {0}\nCity: {1}\nStreet: {2}\nZipcode: {3}\n".format(per.newP.address.state.decode('utf-8'),per.newP.address.city.decode('utf-8'),per.newP.address.street.decode('utf-8'),per.newP.address.zipCode,per.newP.name.decode('utf-8')))
+
+#A function that takes a wPerson object and changes its name attribute then returns the old name.
+
+def NameChange(wPerson per,str actual_name):  
+	print("Incorrect name {0} is changed into ".format(per.newP.name.decode('utf-8')),end="")
+	cdef string old_name = per.newP.name
+	per.newP.name = actual_name.encode('utf-8')
+	print(per.newP.name.decode('utf-8'))
+	return old_name.decode('utf-8')
