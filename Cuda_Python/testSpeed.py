@@ -34,9 +34,14 @@ total = 0;
 
 repetition = 100
 for i in range(repetition):
+
+	#print("Calling timeit")
+
 	cudaV = timeit.timeit(stmt="helperCuda()",
 						setup=test_code,
 						number=1)
+	
+	#print("Out of timeit")
 	
 	total += cudaV #Add total time
 

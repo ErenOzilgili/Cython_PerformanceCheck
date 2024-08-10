@@ -3,6 +3,7 @@
 #include <random>
 #include <cstdint>
 #include <chrono>
+#include <cuda_runtime.h>
 
 //CUDA Kernel
 __global__ void vectorAdd(const int *__restrict a,
@@ -58,8 +59,13 @@ void calcSumPar(int* a, int* b, int* result, int len){
     //Number of thread blocks
     int numThreadBlock = (N + threadNum_perThreadBl - 1) / threadNum_perThreadBl;
 
+    //std::cout << "Calling kernel" << std::endl;
+
     //Launch the kernel
     vectorAdd<<<numThreadBlock, threadNum_perThreadBl>>>(d_a, d_b, d_c, N);
+    cudaDeviceSynchronize();
+
+    //std::cout << "Kernel ended" << std::endl;
 
     //Copy sum of vectors (c) to host
     cudaMemcpy(result , d_c, bytes, cudaMemcpyDeviceToHost);
@@ -89,7 +95,7 @@ int main(){
     std::uniform_int_distribution<> distr(0, range_max); // Define the range
 
     int loop_size = 100;
-    long long total_duration = 0;
+    float total_duration = 0;
 
     //long long overhead_duration = 0;
     /* //Overhead calculation
@@ -100,6 +106,10 @@ int main(){
     }  */
 
     for(int i = 0; i < loop_size; i++){
+        cudaEvent_t start, stop;
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+
         int* array1 = new int[array_size];
         int* array2 = new int[array_size];
 
@@ -111,23 +121,36 @@ int main(){
         }
 
         // Start time
-        auto start = std::chrono::high_resolution_clock::now();
+        //auto start = std::chrono::high_resolution_clock::now();
+        cudaEventRecord(start);
+
+        //std::cout << "Calling calcSumPar" << std::endl;
 
         //Operation
         calcSumPar(array1, array2, result, array_size);
 
+        //std::cout << "Ended calcSumPar" << std::endl;
+
         // End time
-        auto end = std::chrono::high_resolution_clock::now();
+        //auto end = std::chrono::high_resolution_clock::now();
+        cudaEventRecord(stop);
+
+        // Wait for the stop event to complete
+        cudaEventSynchronize(stop);
 
         // Calculate the elapsed time for this iteration
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        //auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+        // Calculate the elapsed time in milliseconds
+        float duration;
+        cudaEventElapsedTime(&duration, start, stop);
         total_duration += duration;
     
         delete[] array1;
         delete[] array2; 
     }
 
-    std::cout << "Time it took in seconds (seconds = 10^6 microseconds): " << (total_duration)*pow(10, 6) << std::endl;
+    std::cout << "Time it took in miliseconds (miliseconds = 10^-3 seconds): " << (total_duration) << std::endl;
 
     return 0;
 }
