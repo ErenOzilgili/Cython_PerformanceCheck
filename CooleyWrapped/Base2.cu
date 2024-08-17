@@ -6,6 +6,8 @@
 #include "Base2.cuh"
 
 using std::cout, std::endl;
+using namespace cooperative_groups;
+namespace cg = cooperative_groups;
 
 __host__ int bitReverse(int toReverse, int n){
 	int exponent = std::log2(n) - 1;
@@ -63,6 +65,20 @@ __global__ void parButterFlies(int num, float2* input, bool coeffToVec){
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
     int currTid = tid;
 
+    thread_block tb = this_thread_block();
+
+    __shared__ float2 sharedMem[2048];
+
+    //Load the part of the global memory for each thread.
+    //(1)
+    sharedMem[tid] = input[tid]; sharedMem[(num/2) + tid] = input[(num/2) + tid];
+    //(2)
+    //make threads load: 0 --> 0,1 --- 1 --> 2,3 etc. This might be an alternative.
+
+    //Synchronise to ensure the data is put into sharedMemory entirely.
+    tb.sync();
+    
+
     if(coeffToVec){
         for(int i = 0; i < logNum; i++){
             currTid = tid + ((tid / offset) * offset);
@@ -71,11 +87,13 @@ __global__ void parButterFlies(int num, float2* input, bool coeffToVec){
             float angle = (tid % offset) * (-2.0f) * M_PI / (2 * offset);
             float2 rootCom = make_float2(cosf(angle), sinf(angle)); 
 
-            // Perform the butterfly operations
-            cooleyButterOp(input[currTid], input[currTid + offset], rootCom);
+            //Perform the butterfly operations
+            cooleyButterOp(sharedMem[currTid], sharedMem[currTid + offset], rootCom);
+            //cooleyButterOp(input[currTid], input[currTid + offset], rootCom);
 
             offset *= 2;
-            __syncthreads();
+            tb.sync();
+            //__syncthreads();
         }
     }
     else{
@@ -88,15 +106,23 @@ __global__ void parButterFlies(int num, float2* input, bool coeffToVec){
             float2 rootCom = make_float2(cosf(angle), sinf(angle)); 
 
             // Perform the butterfly operations
-            cooleyButterOp(input[currTid], input[currTid + offset], rootCom);
+            cooleyButterOp(sharedMem[currTid], sharedMem[currTid + offset], rootCom);
+            //cooleyButterOp(input[currTid], input[currTid + offset], rootCom);
 
             offset *= 2;
-            __syncthreads();
+            tb.sync();
+            //__syncthreads();
         }
         //Divide by factor of n. Notice that offset is n by the end of the loop.
-        invCooleyNormalize(tid, offset/2, input); //So we need to pass the half of the current offset.
-        
+        //invCooleyNormalize(tid, offset/2, input); //So we need to pass the half of the current offset.
+        invCooleyNormalize(tid, offset/2, sharedMem); //So we need to pass the half of the current offset.
     }
+
+    //Record into global memory, here, namely input pointer.
+    input[tid] = sharedMem[tid]; input[(num/2) + tid] = sharedMem[(num/2) + tid];
+    //Synchronise the thread block to ensure data is consistent at the end in the global memory.
+    tb.sync();
+    
 }
 
 __global__ void mulInPar(float2* x, float2* y, float2* result){

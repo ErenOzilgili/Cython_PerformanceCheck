@@ -100,9 +100,9 @@ class ParametersTLWE:
             """
                 Below two lines should be deleted, only tryouts.
             """
-            x = [2, 3, 4, 1]
-            y = [1, 2, 1, 1]
-            prepRes = [0, 0, 0, 0, 0, 0, 0, 0]
+            x = (2**7) * [2, 3, 4, 1] #--> size of 2**9
+            y = (2**7) * [1, 2, 1, 1]
+            prepRes = (2**7) * [0, 0, 0, 0, 0, 0, 0, 0] #--> Result will be of size 2**10
             arrX = np.array([(val, 0.0) for val in x], dtype=float2_dtype)
 
             arrY = np.array([(val, 0.0) for val in y], dtype=float2_dtype)
@@ -110,23 +110,23 @@ class ParametersTLWE:
             prep = np.array([(val, 0.0) for val in prepRes], dtype=float2_dtype)
 
             """
-            #fft and invfft
+            fft and invfft
             coeffToGetX = performOp_Cy(arrX, self.N)
 
             print("Print the list X after FFT and invFFT:")
             print(coeffToGetX)
 
-            #print("Print the list X:")
-            #print(arrY)
+            print("Print the list X:")
+            print(arrY)
             """
-            arrXPadded = np.pad(arrX, (0, 4), mode='constant', constant_values=(0.0, 0.0))
-            arrYPadded = np.pad(arrY, (0, 4), mode='constant', constant_values=(0.0, 0.0))
+            arrXPadded = np.pad(arrX, (0, 2**9), mode='constant', constant_values=(0.0, 0.0))#Pad with 2**9 elements to reach 2**10 elements
+            arrYPadded = np.pad(arrY, (0, 2**9), mode='constant', constant_values=(0.0, 0.0))
             #resultOfPolyMul = np.pad(z, (0, 2 * 4), mode='constant', constant_values=(0.0, 0.0))
 
-            resultOfPolyMul = mulPolys(arrXPadded, arrYPadded, prep, 8)
+            resultOfPolyMul = mulPolys(arrXPadded, arrYPadded, prep, 2**10)
 
             print("Result:")
-            for i in range(0, 8):
+            for i in range(0, 2**10):
                 print(i, "th result: ", np.round(resultOfPolyMul[i][0]))
             
 
