@@ -143,24 +143,22 @@ void multiplyPolCoeffs(float2* poly1, float2* poly2, float2* result, int N){
     for(int i = 0; i < N; i++){
         polyReversed[bitReverse(i, N)] = poly1[i];
     }
-
+    
     //Print, later on delete
+    /*
     for(int i = 0; i < N; i++){
         cout << "polyReversed1 " << i << "th value:" << polyReversed[i].x << " " << polyReversed[i].y << endl;
     }
+    */
 
     float2* d_vecPoly1;
     cudaMalloc(&d_vecPoly1, N * sizeof(float2));
 
 	cudaMemcpy(d_vecPoly1, polyReversed, N * sizeof(float2), cudaMemcpyHostToDevice);
 
-    cout << "1" << endl;
-
     //Forward fft
     parButterFlies<<< 1, N/2 >>>(N, d_vecPoly1, true);
     cudaDeviceSynchronize();
-
-    cout << "2" << endl;
 
     /////////////////
 
@@ -169,27 +167,22 @@ void multiplyPolCoeffs(float2* poly1, float2* poly2, float2* result, int N){
     float2* d_vecPoly2;
     cudaMalloc(&d_vecPoly2, N * sizeof(float2));
 
-    cout << "3" << endl;
-
     for(int i = 0; i < N; i++){
         polyReversed[bitReverse(i, N)] = poly2[i];
     }
 
     //Print, later on delete
+    /*
     for(int i = 0; i < N; i++){
         cout << "polyReversed2 " << i << "th value:" << polyReversed[i].x << " " << polyReversed[i].y << endl;
     }
-
+    */
 
 	cudaMemcpy(d_vecPoly2, polyReversed, N * sizeof(float2), cudaMemcpyHostToDevice);
-
-    cout << "4" << endl;
 
     //Forward fft
     parButterFlies<<< 1, N/2 >>>(N, d_vecPoly2, true);
     cudaDeviceSynchronize();
-
-    cout << "5" << endl;
 
     ///////////////
 
@@ -216,10 +209,12 @@ void multiplyPolCoeffs(float2* poly1, float2* poly2, float2* result, int N){
 
     cudaMemcpy(result, d_resultVecPoly, N * sizeof(float2), cudaMemcpyDeviceToHost);
 
-        //Print, later on delete
+    //Print, later on delete
+    /*
     for(int i = 0; i < N; i++){
         cout << "result " << i << "th value:" << result[i].x << " " << result[i].y << endl;
     }
+    */
 
     cudaFree(d_resultVecPoly);
     cudaFree(d_vecPoly1);
