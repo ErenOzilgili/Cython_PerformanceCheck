@@ -59,7 +59,7 @@ __device__ inline void invCooleyNormalize(int tid, int offset, float2* input){
 }
 
 __global__ void parButterFlies(int num, float2* input, bool coeffToVec){
-    //Will have threads = num / 2.
+    //Will have total of num/2 threads since we are doing radix-2 Cooley Tukey.
     int logNum = __float2int_rz(log2f((float)num));  // Using log2f for single-precision log2
     int offset = 1;
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -67,18 +67,15 @@ __global__ void parButterFlies(int num, float2* input, bool coeffToVec){
 
     thread_block tb = this_thread_block();
 
-    __shared__ float2 sharedMem[2048];
+    extern __shared__ float2 sharedMem[];
 
     //Load the part of the global memory for each thread.
-    //(1)
     sharedMem[tid] = input[tid]; sharedMem[(num/2) + tid] = input[(num/2) + tid];
-    //(2)
-    //make threads load: 0 --> 0,1 --- 1 --> 2,3 etc. This might be an alternative.
 
     //Synchronise to ensure the data is put into sharedMemory entirely.
     tb.sync();
     
-
+    //Start performing the stages, if coeffToVec=true FFT and if not inverse FFT.
     if(coeffToVec){
         for(int i = 0; i < logNum; i++){
             currTid = tid + ((tid / offset) * offset);
@@ -89,15 +86,12 @@ __global__ void parButterFlies(int num, float2* input, bool coeffToVec){
 
             //Perform the butterfly operations
             cooleyButterOp(sharedMem[currTid], sharedMem[currTid + offset], rootCom);
-            //cooleyButterOp(input[currTid], input[currTid + offset], rootCom);
 
             offset *= 2;
             tb.sync();
-            //__syncthreads();
         }
     }
     else{
-        //printf("Implement inverse fft for here, vector to coeff\n");
         for(int i = 0; i < logNum; i++){
             currTid = tid + ((tid / offset) * offset);
 
@@ -107,14 +101,11 @@ __global__ void parButterFlies(int num, float2* input, bool coeffToVec){
 
             // Perform the butterfly operations
             cooleyButterOp(sharedMem[currTid], sharedMem[currTid + offset], rootCom);
-            //cooleyButterOp(input[currTid], input[currTid + offset], rootCom);
 
             offset *= 2;
             tb.sync();
-            //__syncthreads();
         }
         //Divide by factor of n. Notice that offset is n by the end of the loop.
-        //invCooleyNormalize(tid, offset/2, input); //So we need to pass the half of the current offset.
         invCooleyNormalize(tid, offset/2, sharedMem); //So we need to pass the half of the current offset.
     }
 
@@ -132,9 +123,6 @@ __global__ void mulInPar(float2* x, float2* y, float2* result){
 }
 
 void multiplyPolCoeffs(float2* poly1, float2* poly2, float2* result, int N){
-    //float2* result;
-    //result = (float2*)malloc(N * sizeof(float2));
-
     float2* polyReversed;
     polyReversed = (float2*)malloc(N * sizeof(float2));
 
@@ -144,20 +132,13 @@ void multiplyPolCoeffs(float2* poly1, float2* poly2, float2* result, int N){
         polyReversed[bitReverse(i, N)] = poly1[i];
     }
     
-    //Print, later on delete
-    /*
-    for(int i = 0; i < N; i++){
-        cout << "polyReversed1 " << i << "th value:" << polyReversed[i].x << " " << polyReversed[i].y << endl;
-    }
-    */
-
     float2* d_vecPoly1;
     cudaMalloc(&d_vecPoly1, N * sizeof(float2));
 
 	cudaMemcpy(d_vecPoly1, polyReversed, N * sizeof(float2), cudaMemcpyHostToDevice);
 
     //Forward fft
-    parButterFlies<<< 1, N/2 >>>(N, d_vecPoly1, true);
+    parButterFlies<<< 1, N/2, N * sizeof(float2) >>>(N, d_vecPoly1, true);
     cudaDeviceSynchronize();
 
     /////////////////
@@ -171,17 +152,10 @@ void multiplyPolCoeffs(float2* poly1, float2* poly2, float2* result, int N){
         polyReversed[bitReverse(i, N)] = poly2[i];
     }
 
-    //Print, later on delete
-    /*
-    for(int i = 0; i < N; i++){
-        cout << "polyReversed2 " << i << "th value:" << polyReversed[i].x << " " << polyReversed[i].y << endl;
-    }
-    */
-
 	cudaMemcpy(d_vecPoly2, polyReversed, N * sizeof(float2), cudaMemcpyHostToDevice);
 
     //Forward fft
-    parButterFlies<<< 1, N/2 >>>(N, d_vecPoly2, true);
+    parButterFlies<<< 1, N/2, N * sizeof(float2) >>>(N, d_vecPoly2, true);
     cudaDeviceSynchronize();
 
     ///////////////
@@ -204,103 +178,13 @@ void multiplyPolCoeffs(float2* poly1, float2* poly2, float2* result, int N){
 
     cudaMemcpy(d_resultVecPoly, polyReversed, N * sizeof(float2), cudaMemcpyHostToDevice);
 
-    parButterFlies<<<1, N/2>>>(N, d_resultVecPoly, false);
+    parButterFlies<<<1, N/2, N * sizeof(float2)>>>(N, d_resultVecPoly, false);
     cudaDeviceSynchronize();
 
     cudaMemcpy(result, d_resultVecPoly, N * sizeof(float2), cudaMemcpyDeviceToHost);
-
-    //Print, later on delete
-    /*
-    for(int i = 0; i < N; i++){
-        cout << "result " << i << "th value:" << result[i].x << " " << result[i].y << endl;
-    }
-    */
 
     cudaFree(d_resultVecPoly);
     cudaFree(d_vecPoly1);
     cudaFree(d_vecPoly2);
     free(polyReversed);
-
-    //return result;
 }
-
-//Helper function for operating
-//fft and inverse fft with the data
-//coming from the python.
-void prepOperations(float2* input, int N){
-    //Hold the reversed bits of coefficients in host side.
-    float2* inputReversed;
-    inputReversed = (float2*)malloc(N * sizeof(float2));
-
-    //Bit reverse, update later on.
-    for(int i = 0; i < N; i++){
-        inputReversed[bitReverse(i, N)] = input[i];
-    }
-
-    float2* device_vecs;
-    cudaMalloc(&device_vecs, N * sizeof(float2));
-
-	cudaMemcpy(device_vecs, inputReversed, N * sizeof(float2), cudaMemcpyHostToDevice);
-
-    //Forward fft
-    parButterFlies<<< 1, N/2 >>>(N, device_vecs, true);
-    cudaDeviceSynchronize();
-
-    /////////////////////////////////////////
-
-    //For holding the fft'ed vector in device, will be used to store bit reversed version.
-    float2* device_vecsReversed;
-    cudaMalloc(&device_vecsReversed, N * sizeof(float2));
-
-    // (***)
-    cudaMemcpy(input, device_vecs, N * sizeof(float2), cudaMemcpyDeviceToHost);
-    //Bit reverse, update later on.
-    for(int i = 0; i < N; i++){
-        inputReversed[bitReverse(i, N)] = input[i];
-    }
-    cudaMemcpy(device_vecsReversed, inputReversed, N * sizeof(float2), cudaMemcpyHostToDevice);
-
-    /* (***)
-    //Bit reverse again for doing inverse fft, update later on.
-    for(int i = 0; i < N; i++){
-        device_vecsReversed[bitReverse(i, N)] = device_vecs[i];
-    }
-    cout << "7" << endl;
-    */
-
-    //Delete later on
-    cout << "After fft is performed and result is returned back to host, this is the result." << endl;
-    for(int i = 0; i < N; i++){
-        printf("%dth element: %f , %f\n", i , input[i].x ,  input[i].y);
-    }
-    cout << "After above, it will be bit reversed and recorded into inputReversed." << endl;
-    cout << "Then it will be recorded into device_vecsReversed, will apply inverse fft and back into host input." << endl;
-
-    //Inverse fft
-    parButterFlies<<< 1, N/2 >>>(N, device_vecsReversed, false);
-    cudaDeviceSynchronize();
-
-    //Copy back into the input, the original results.
-    cudaMemcpy(input, device_vecsReversed, N * sizeof(float2), cudaMemcpyDeviceToHost);
-
-    //Free not needed elements
-    cudaFree(device_vecs);
-    cudaFree(device_vecsReversed);
-    free(inputReversed);
-}
-
-/*
-int main(){
-    int arr[8] = {0, 1, 2 ,3, 4, 5, 6, 7};
-
-    int arrRev[8];
-
-    for(int i = 0; i < 8 ; i++){
-        arrRev[bitReverse(i, 8)] = arr[i];
-    }
-
-    for(int j = 0; j < 8; j++){
-        cout << arrRev[j] << " ";
-    }
-}
-*/

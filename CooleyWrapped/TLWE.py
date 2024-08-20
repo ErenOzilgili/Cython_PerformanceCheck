@@ -1,12 +1,12 @@
 import numpy as np
 #import cython function
-from tfhe_fft import performOp_Cy, mulPolys, schoolBookMul
+from tfhe_fft import mulPolys, schoolBookMul
 import timeit
 
 """
     General Notes:
         Define as trivial the samples having the mask a = 0 and
-        noiseless the samples having the standard deviation alpha = 0.
+        noiseless the samples having the standard deviation sigma = 0.
         
 """
 
@@ -27,7 +27,9 @@ class ParametersTLWE:
         self.sigma = sigma
         self.q = q
         self.p = p
+        self.sample_a()
         self.sample_s() #Sample the secret key
+        self.publicKey(self.a, self.s)
 
     def sample_s(self):
         """
@@ -40,7 +42,8 @@ class ParametersTLWE:
             uniformly sampled coefficients in {0, 1}.
         """
         #TODO change this
-        self.s = [(list)( np.rint(np.random.uniform(0, 1, size=self.N)) ) for i in range(0, self.k)]
+        self.s = [list( np.rint(np.random.uniform(0, 1, size=self.N)) ) for i in range(0, self.k)]
+        return self.s
 
     def sample_a(self):
         """
@@ -52,8 +55,9 @@ class ParametersTLWE:
             Although we are sampling x = mod q, remember that we
             are after all we are working in x/q which is an element of torus.
         """
-        #return [(list)( np.random.uniform(0, 1, size=self.N) ) for i in range(0, self.k)]
-        return  [(list)( np.random.randint(0, self.q, size=self.N) ) for i in range(0, self.k)]
+        #return [list( np.random.uniform(0, 1, size=self.N) ) for i in range(0, self.k)]
+        self.a = [list( np.random.randint(0, self.q, size=self.N) ) for i in range(0, self.k)]
+        return self.a
 
     def sample_error(self):
         """
@@ -66,7 +70,21 @@ class ParametersTLWE:
         #print(error)
 
         #TODO take a look at how the rounding is being made SoK page 7.
-        return (list)(np.round(self.q * error))
+        self.error = list(np.round(self.q * error))
+        return self.error
+    
+    def publicKey(self, a:list, s:list):
+        #TODO look if k > 1. May work nevertheless.
+
+        product = self.dotProductPolys(self.a, self.s)
+        # Reduce the below mod X^N + 1
+        productReduced = [(x - y) for x, y in zip(product[:self.N], product[self.N:2*self.N])]
+        """
+        print("ProductReduced: ")
+        print(productReduced)
+        """
+
+        self.pk = [x for x in a] + [self.addPolys(productReduced, self.sample_error())]
 
     def encrypt(self):
         """
@@ -82,7 +100,7 @@ class ParametersTLWE:
     def encode(self, message, error):
         pass
 
-    def func_phase(self, ciphertext:list):
+    def func_phase(self):
         """
             Performs part of the decryption process.
 
@@ -92,7 +110,8 @@ class ParametersTLWE:
             a.s denotes the dot product of the two vectors.
             Note that s is SK (secret key).
         """
-        return self.subtractPolys(ciphertext[1], self.dotProductPolys(self.s, ciphertext[0]))
+        #TODO look if k > 1. May wokr nevertheless.
+        return self.subtractPolys(self.ciphertext[1], self.dotProductPolys(self.s, self.ciphertext[0]))
 
     def mulPolys(self, x:list, y:list):
         """
@@ -100,36 +119,6 @@ class ParametersTLWE:
 
             Take the dot product of vector a
             and secret key SK. Use cuda and perform fft.
-        """
-
-        """
-        #Threshold for deciding between python and cuda.
-        if True:#Cuda
-            #Note: Consider using double2 in cuda, maybe.
-            #Create an array of float2
-            x = (2**7) * [2, 3, 4, 1] #--> size of 2**9
-            y = (2**7) * [1, 2, 1, 1]
-            prepRes = (2**7) * [0, 0, 0, 0, 0, 0, 0, 0] #--> Result will be of size 2**10
-
-            arrX = np.array([(val, 0.0) for val in x], dtype=float2_dtype)
-
-            arrY = np.array([(val, 0.0) for val in y], dtype=float2_dtype)
-
-            prep = np.array([(val, 0.0) for val in prepRes], dtype=float2_dtype)
-            
-            arrXPadded = np.pad(arrX, (0, 2**9), mode='constant', constant_values=(0.0, 0.0))#Pad with 2**9 elements to reach 2**10 elements
-            arrYPadded = np.pad(arrY, (0, 2**9), mode='constant', constant_values=(0.0, 0.0))
-            #resultOfPolyMul = np.pad(z, (0, 2 * 4), mode='constant', constant_values=(0.0, 0.0))
-
-            resultOfPolyMul = mulPolys(arrXPadded, arrYPadded, prep, 2**10)
-
-            print("Result:")
-            for i in range(0, 2**10):
-                print(i, "th result: ", np.round(resultOfPolyMul[i][0]))
-            
-
-        else:#Python
-            pass
         """
         assert len(x) == len(y)
 
@@ -152,14 +141,14 @@ class ParametersTLWE:
         polyMul = [np.round(val['x']) for val in resultOfPolyMul]
 
         #TODO may not be (list). Think.
-        return (list)(polyMul)
+        return list(polyMul)
         
     def dotProductPolys(self, x:list, y:list):
         """
-            x may represent the vector-a
-            y may represent the vector-s
+            x may represent the vector_a
+            y may represent the vector_s
 
-            vector-a . vector-s
+            (vector_a) . (vector_s)
         """
         #Result will be stored in this list.
         sumIndDots = 2 * self.N * [0]
@@ -176,7 +165,7 @@ class ParametersTLWE:
         """
         #Set a threshold according to N
         if True:
-            return [x[i]-y[j] for i,j in range(0, self.N)] 
+            return [x[i] + y[i] for i in range(0, self.N)] 
         else:
             pass
 
@@ -186,19 +175,41 @@ class ParametersTLWE:
         """
         #Set a threshold for N
         if True:         
-            return [x[i]-y[j] for i,j in range(0, self.N)] 
+            return [x[i]-y[i] for i in range(0, self.N)] 
         else:
             pass
 
 #Testing
 #--------------
-sigma=2**(-25)
-sample = ParametersTLWE(k = 1, N = 2**10, sigma=sigma, q=8, p=4)
+sigma=2**(-2) #2**-25
+N = 2**2
+q = 2**4
+p = 2**2
+k = 2
+sample = ParametersTLWE(k = k, N = N, sigma=sigma, q=q, p=p)
 
+print("\nSecret key is sampled like this: ")
+print(sample.s)
+
+print("\nVector_a is sampled like this: ")
+print(sample.a)
+
+"""
+print("\nvector_a . vector_s: ")
+print(sample.dotProductPolys(sample.a, sample.s))
+"""
+
+print("\nPublic key: ")
+print(sample.pk)
+
+print("\nError was the below when public key were created: ")
+print(sample.error)
+
+"""
 print("Secret key is sampled like this:")
 print(sample.s)
 
-print("Vector-a is sampled like this: ")
+print("vector_a is sampled like this: ")
 a = sample.sample_a()
 print(a)
 
@@ -206,88 +217,17 @@ print("Error: ")
 error = sample.sample_error()
 print(error)
 
-print("(b - error) is (vector-a . vector-s): ")
+print("(b - error) is  vector_a . vector_s): ")
 #TODO
 #Remember that here we are printing 2*N coeffs, but it should have (2 * N) - 1
 #Later reduce this mod X^N + 1
+
+#Reducing in a way
+prod_as = sample.dotProductPolys(sample.s, a)
+prod_as_reduced = [(x - y) for x, y in zip(prod_as[:N], prod_as[N:2*N])]
+
 print(sample.dotProductPolys(sample.s, a))
 
-"""
-sumIndDots = [(0, 0), (0,0)]
-sumIndDots = [(a[0] + s[0], a[1] + s[1]) for a, s in zip(sumIndDots, [(1, 2), (3, -4)])] #Each of x[i] and y[i] have N coefficients.
-
-print(sumIndDots)
-"""
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-"""
-def callCudaForSpeed():
-    resultOfPolyMul = mulPolys(arrXPadded, arrYPadded, prep, 2**10)
-    return resultOfPolyMul
-def callCythonForSpeedSchool():
-    resultOfPolyMul = schoolBookMul(arrX, arrY, prep, 2**9)
-    return resultOfPolyMul
-
-def mulSpeedTest():
-        if True:
-
-            x = (2**7) * [2, 3, 4, 1] #--> size of 2**9
-            y = (2**7) * [1, 2, 1, 1]
-            prepRes = (2**7) * [0, 0, 0, 0, 0, 0, 0, 0] #--> Result will be of size 2**10
-
-            global arrX
-            arrX = np.array([(val, 0.0) for val in x], dtype=float2_dtype)
-            global arrY
-            arrY = np.array([(val, 0.0) for val in y], dtype=float2_dtype)
-
-            x = (2**7) * [2, 6, 1, -1] #--> size of 2**9
-            y = (2**7) * [2, 4, 3, 0]
-            global arrXPadded
-            arrXPadded = np.pad(arrX, (0, 2**9), mode='constant', constant_values=(0.0, 0.0))#Pad with 2**9 elements to reach 2**10 elements 
-            global arrYPadded
-            arrYPadded = np.pad(arrY, (0, 2**9), mode='constant', constant_values=(0.0, 0.0))
-
-            #Shared
-            global prep
-            prep = np.array([(val, 0.0) for val in prepRes], dtype=float2_dtype)
-            #resultOfPolyMul = np.pad(z, (0, 2 * 4), mode='constant', constant_values=(0.0, 0.0))
-            timeOfFFTCuda = timeit.timeit(stmt="callCudaForSpeed()", setup="from __main__ import callCudaForSpeed", number=1)
-            resultOfPolyMulCu = callCudaForSpeed()
-
-            print("Result:")
-            for i in range(0, 2**10):
-                print(i, "th result: ", np.round(resultOfPolyMulCu[i][0]))
-
-            timeOfFFTCySchool = timeit.timeit(stmt="callCythonForSpeedSchool()", setup="from __main__ import callCythonForSpeedSchool", number=1)
-            resultOfPolyCy = callCythonForSpeedSchool()
-
-            print("Result:")
-            for i in range(0, 2**10):
-                print(i, "th result: ", np.round(resultOfPolyCy[i][0]))
-
-            for i in range (0, 2**10):
-                assert np.round(resultOfPolyCy[i][0]) == np.round(resultOfPolyMulCu[i][0])
-            print("Succesful")
-
-            print("Cuda: ", timeOfFFTCuda)
-            print("Cython: ", timeOfFFTCySchool)
-
-        else:#Python
-            pass
-
-        return None #TODO change later on
-
-mulSpeedTest()
+print("Reduced --> (b - error) is  vector_a . vector_s): ")
+print(prod_as_reduced)
 """
