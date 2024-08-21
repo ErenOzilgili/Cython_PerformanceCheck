@@ -2,5 +2,6 @@
 #define MATRIXSUM_H
 
 void funcX();
+void resetDevice();
 
 #endif

@@ -19,6 +19,10 @@ __global__ void vectorAdd(int* a,
 
 }
 
+void resetDevice(){
+    cudaDeviceReset();
+}
+
 /*
 Verification for the results.
 */
@@ -33,9 +37,6 @@ void verify_result(int *a,
 void funcX(){
     //Size of the vector addition
     int N = 1 << 20;
-    //std::cout<< N << std::endl;
-
-    //std::cout << "In funcX" << std::endl;
 
     size_t bytes = N * sizeof(int);
 
@@ -70,11 +71,9 @@ void funcX(){
     //Number of thread blocks
     int numThreadBlock = (N + threadNum_perThreadBl - 1) / threadNum_perThreadBl;
 
-    //std::cout << "Call gpu" << std::endl;
     //Launch the kernel
     vectorAdd<<<numThreadBlock, threadNum_perThreadBl>>>(d_a, d_b, d_c, N);
     cudaDeviceSynchronize();
-    //std::cout << "Ended gpu" << std::endl;
 
     //Copy sum of vectors (c) to host
     cudaMemcpy(c , d_c, bytes, cudaMemcpyDeviceToHost);
@@ -89,55 +88,54 @@ void funcX(){
     free(a);
     free(b);
     free(c);
-
-    //std::cout << "Out func" << std::endl;
 }
 
 int main(){
+    cudaDeviceReset();
+
+    //(1)
     /*
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
+    */
 
     float total_duration = 0;
     float duration = 0;
 
     int repetition = 100;
-    */
 
-    //float record[repetition];
-
-    //for(int i = 0; i < 100; i++){
+    for(int i = 0; i < repetition; i++){
         //Start the clock
+        //(1)
         //cudaEventRecord(start);
+        //(2)
+        auto start = std::chrono::high_resolution_clock::now();
 
-        //std::cout << "Start the clock" << std::endl;
-        //auto start = std::chrono::high_resolution_clock::now();
         //funcX call
-    funcX();
+        funcX();
 
         // End time
+        //(1)
         //cudaEventRecord(stop);
-        //auto end = std::chrono::high_resolution_clock::now();
+        //(2)
+        auto end = std::chrono::high_resolution_clock::now();
 
-        // Wait for the stop event to complete
+        //Wait for the stop event to complete
+        //(1)
         //cudaEventSynchronize(stop);
-        //auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-        //std::cout << "Stop the clock" << std::endl;
 
-        // Calculate the elapsed time in milliseconds
+        //(2)
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+        //Calculate the elapsed time in milliseconds
+        //(1)
         //cudaEventElapsedTime(&duration, start, stop);
 
-        //total_duration += duration;
-        //record[i] = duration;
-    //}
-
-    //std::cout << "Calculations are correct" << std::endl;
-    //std::cout << "Time it took in miliseconds (miliseconds * 10^3 =  seconds): " << (total_duration) << "\n" << std::endl;
-
-    /*
-    for(int i = 0; i < repetition; i++){
-        std::cout << record[i] << std::endl;
+        total_duration += duration;
     }
-    */
+
+    std::cout << "Calculations are correct" << std::endl;
+    std::cout << "Time it took in seconds (miliseconds * 10^3 =  seconds): " << (total_duration/1000) << "\n" << std::endl;
+    std::cout << "Amortized time in seconds (miliseconds * 10^3 =  seconds): " << (total_duration/1000) / repetition << "\n" << std::endl;
 }
