@@ -7,5 +7,9 @@
 #include <vector>
 
 void calcSumPar(int* a, int* b, int* result, int len);
+void calcSum(int* a, int* b, int* result, int len);
+void helperPar(int* a, int* b, int* result, int len);
+int* allocate_on_heap(size_t size);
+void initialize();
 
 #endif

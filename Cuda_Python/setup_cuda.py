@@ -27,7 +27,7 @@ ext_modules = [
         sources=["./Cython/cythonCu.pyx", "./Codes/matrixSum.cu"],
         include_dirs=[np.get_include(), get_python_inc()],
         library_dirs=["/usr/lib/cuda/lib64"],
-        libraries=["cudart"],
+        libraries=["cudart", "cuda"],
         language="c++",
         extra_compile_args={'gcc': ["-std=c++11", "-fPIC"],
                             'nvcc': ['-arch=sm_75']},
@@ -36,7 +36,7 @@ ext_modules = [
 ]
 
 setup(
-    name="speedTest",
+    name="wrappedCuda",
     ext_modules=ext_modules,
     cmdclass={'build_ext': custom_build_ext},
     zip_safe=False,
