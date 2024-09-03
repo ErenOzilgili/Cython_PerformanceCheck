@@ -10,3 +10,4 @@ personObj = wrappedPerson.wPerson(name, age, address)
 
 #Update the age of the person
 personObj.updateA(21)
+personObj.display()
