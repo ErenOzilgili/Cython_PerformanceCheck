@@ -63,6 +63,12 @@ cdef class wPerson:
 		else:
 			print("Did catch but not runtime_error!")
 
+	def exception2(self):
+		try:
+			self.newP.errorRaise()
+		finally:
+			pass
+
 	cdef Person.Address __arrangeAddrInfo(self, tuple address):
 		cdef Person.Address addr
 		addr.street = address[0].encode('utf-8')
