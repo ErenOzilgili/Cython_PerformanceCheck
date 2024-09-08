@@ -1,0 +1,6 @@
+
+*.so
+
+*.o
+
+Other/Person/wrapper.cpp
