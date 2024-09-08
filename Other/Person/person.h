@@ -28,6 +28,7 @@ public:
 	void displayPersonInfo();
 	void changeAddress(const Address& newAddress);
 	void updateAge(int newAge);
+    void errorRaise();
 };
 
 #endif

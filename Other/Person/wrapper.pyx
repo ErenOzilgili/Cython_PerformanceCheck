@@ -1,4 +1,3 @@
-# distutils: language=c++
 from libcpp.string cimport string
 
 cdef extern from "person.h":
@@ -19,7 +18,8 @@ cdef extern from "person.h":
 
 		void displayPersonInfo()
 		void changeAddress(const Address& newAddress)
-		void updateAge(int newAge)
+		void updateAge(int newAge) except +
+		void errorRaise() except +
 
 cdef class wPerson:
 	cdef Person* newP
@@ -41,9 +41,27 @@ cdef class wPerson:
 		cdef Person.Address addr = self.__arrangeAddrInfo(address)
 		self.newP.changeAddress(addr)
 
-	def updateA(self, int age):
-		self.newP.updateAge(age)
-		print("(Cython) You are {0} now".format(age))
+	def updateA(self, age):
+		try:
+			self.newP.updateAge(age)
+			print("(Cython) You are {0} now".format(age))
+		except TypeError as e:
+			print("Error has been encountered! String is passed when expected int")
+			#raise RuntimeError(e)
+		except RuntimeError as e:
+			print("Error has been encountered! Runtime error --- division by zero here in this example")
+			#raise RuntimeError(e)
+		else:
+			print("Couldn't catch the error type")
+
+	def exception(self):
+		try:
+			self.newP.errorRaise()
+		except RuntimeError as e:
+			print("RuntimeError --- Printed in try-except block except part")
+			#raise RuntimeError(e)
+		else:
+			print("Did catch but not runtime_error!")
 
 	cdef Person.Address __arrangeAddrInfo(self, tuple address):
 		cdef Person.Address addr

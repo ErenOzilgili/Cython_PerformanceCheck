@@ -9,5 +9,18 @@ age = 20
 personObj = wrappedPerson.wPerson(name, age, address)
 
 #Update the age of the person
+print("Updating age... with int = 21")
 personObj.updateA(21)
 personObj.display()
+
+print("\n------------------")
+print("Error thrown from cython itself:")
+print("Updating age... with string = \"a\"")
+personObj.updateA("a")
+
+print("\n--------------------")
+print("Error thrown from c++ and caught in cython:")
+personObj.exception()
+
+
+
